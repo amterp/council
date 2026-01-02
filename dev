@@ -146,8 +146,8 @@ end
     $`git -C {tap} commit -m "council {release}"`
     $`git -C {tap} push`
 
-    // Push council repo with tags
+    // Push council repo (tag already pushed by gh release)
     print("Pushing council...")
-    $`git push origin main --tags`
+    $`git push origin main`
 
     print("Done! {tag} released.")
