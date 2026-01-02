@@ -1,0 +1,9 @@
+# Binary
+council
+
+# Test artifacts
+*.test
+
+# IDE
+.idea/
+.vscode/
