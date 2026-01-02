@@ -353,3 +353,26 @@ func TestNextFlagInvalidParticipant(t *testing.T) {
 		t.Errorf("expected 'not an active participant' error, got: %s", stderr)
 	}
 }
+
+func TestNextDefaultsToModeratorWhenOthersLeft(t *testing.T) {
+	sessionID := createSession(t)
+	joinSession(t, sessionID, "Engineer")
+	joinSession(t, sessionID, "Designer")
+
+	// Designer posts, then leaves
+	runCouncil(t, "First message", "post", sessionID, "--participant", "Designer", "--after", "3")
+	runCouncil(t, "", "leave", sessionID, "--participant", "Designer")
+
+	// Engineer posts - should default to Moderator since Designer left
+	// (Designer was the previous speaker but is no longer active)
+	_, stderr, exitCode := runCouncil(t, "Second message", "post", sessionID, "--participant", "Engineer", "--after", "5")
+	if exitCode != 0 {
+		t.Fatalf("post should succeed when previous speaker left: %s", stderr)
+	}
+
+	// Verify Next is Moderator (not the departed Designer)
+	stdout, _, _ := runCouncil(t, "", "status", sessionID)
+	if !strings.Contains(stdout, "Next: Moderator") {
+		t.Errorf("expected 'Next: Moderator' when previous speaker left, got: %s", stdout)
+	}
+}

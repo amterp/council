@@ -353,8 +353,11 @@ func PostMessage(sessionID, participant, content, next string, afterEventNum int
 
 	// Determine next speaker if not provided
 	if next == "" {
-		// Fallback chain: previous speaker -> random active -> Moderator
-		next = session.PreviousSpeaker(participant)
+		// Fallback chain: previous speaker (if still active) -> random active -> Moderator
+		prevSpeaker := session.PreviousSpeaker(participant)
+		if prevSpeaker != "" && session.IsActiveParticipant(prevSpeaker) {
+			next = prevSpeaker
+		}
 		if next == "" {
 			next = session.RandomActiveParticipant(participant)
 		}

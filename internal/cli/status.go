@@ -105,16 +105,28 @@ func handleAwait(sessionID, participant string, afterN int) {
 			os.Exit(1)
 		}
 
-		// Check if there are new events
+		// Check if there are new events past what we've seen
 		if sess.EventCount() > currentAfter {
-			// Check if it's our turn
 			nextSpeaker := sess.LatestMessageNext()
-			if nextSpeaker == participant {
-				// It's our turn! Show the new events
+
+			// It's our turn if:
+			// 1. The next speaker is explicitly us, OR
+			// 2. The next speaker is no longer active (they left), so anyone can go
+			isOurTurn := nextSpeaker == participant
+			if !isOurTurn && nextSpeaker != "" && nextSpeaker != "Moderator" {
+				// Check if the designated next speaker has left
+				if !sess.IsActiveParticipant(nextSpeaker) {
+					isOurTurn = true
+				}
+			}
+
+			if isOurTurn {
+				// Show all events since the original afterN
 				output := session.FormatStatus(sess, afterN)
 				fmt.Print(output)
 				return
 			}
+
 			// Not our turn, update currentAfter and keep waiting
 			currentAfter = sess.EventCount()
 		}
