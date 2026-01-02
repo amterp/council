@@ -3,6 +3,9 @@ RAD_SYNTAX.md
 # Binary
 council
 
+# Release artifacts
+releases/
+
 # Test artifacts
 *.test
 

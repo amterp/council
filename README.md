@@ -11,11 +11,20 @@ A CLI tool for running collaborative sessions between multiple participants—LL
 
 ## Installation
 
+### Homebrew (macOS)
+
+```bash
+brew tap amterp/tap
+brew install council
+```
+
+### Go Install
+
 ```bash
 go install github.com/amterp/council/cmd/council@latest
 ```
 
-Or build from source:
+### From Source
 
 ```bash
 git clone https://github.com/amterp/council.git

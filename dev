@@ -4,9 +4,11 @@ Local development script for council.
 ---
 
 args:
-    build b bool     # Build the project
-    validate v bool  # Build and run tests
-    push p bool      # Push up to origin.
+    build b bool                      # Build the project
+    validate v bool                   # Build and run tests
+    push p bool                       # Push up to origin
+    release r str?                    # Release version (e.g., 0.1.0)
+    tap_path str = "../homebrew-tap"  # Path to homebrew-tap repo
 
 if build or validate or push:
     $`go build -o council ./cmd/council`
@@ -22,3 +24,85 @@ if push:
     stdout = quiet $`git branch --show-current`
     branch = stdout.trim()
     $`git push origin {branch}`
+
+if release:
+    // Paths
+    stdout = quiet $`pwd`
+    repo = stdout.trim()
+    releases_dir = "{repo}/releases"
+    formula_path = "{repo}/{tap_path}/Formula/council.rb"
+    tag = "v{release}"
+
+    // Build for darwin-arm64
+    print("Building darwin-arm64...")
+    $`GOOS=darwin GOARCH=arm64 go build -o council ./cmd/council`
+    $`mkdir -p {releases_dir}`
+    arm64_tar = "{releases_dir}/council-{release}-darwin-arm64.tar.gz"
+    quiet $`rm -f {arm64_tar}` catch:
+        pass
+    $`tar -czf {arm64_tar} council`
+
+    // Build for darwin-amd64
+    print("Building darwin-amd64...")
+    $`GOOS=darwin GOARCH=amd64 go build -o council ./cmd/council`
+    amd64_tar = "{releases_dir}/council-{release}-darwin-amd64.tar.gz"
+    quiet $`rm -f {amd64_tar}` catch:
+        pass
+    $`tar -czf {amd64_tar} council`
+
+    // Clean up binary
+    quiet $`rm -f council` catch:
+        pass
+
+    // Calculate SHA256
+    stdout = quiet $`shasum -a 256 {arm64_tar}`
+    sha256_arm64 = stdout.split(" ")[0]
+    stdout = quiet $`shasum -a 256 {amd64_tar}`
+    sha256_amd64 = stdout.split(" ")[0]
+
+    // Git tag
+    print("Tagging {tag}...")
+    $`git tag {tag}`
+
+    // GitHub release
+    print("Creating GitHub release...")
+    $`gh release create {tag} {arm64_tar} {amd64_tar} --repo amterp/council --title "Council {tag}" --notes "Council {tag}"`
+
+    // Update formula
+    print("Updating formula...")
+    formula = """
+class Council < Formula
+  desc "CLI tool for collaborative multi-agent sessions"
+  homepage "https://github.com/amterp/council"
+  version "{release}"
+  license "Apache-2.0"
+
+  on_macos do
+    if Hardware::CPU.arm?
+      url "https://github.com/amterp/council/releases/download/v#\{version}/council-#\{version}-darwin-arm64.tar.gz"
+      sha256 "{sha256_arm64}"
+    else
+      url "https://github.com/amterp/council/releases/download/v#\{version}/council-#\{version}-darwin-amd64.tar.gz"
+      sha256 "{sha256_amd64}"
+    end
+  end
+
+  def install
+    bin.install "council"
+  end
+
+  test do
+    system "#\{bin}/council", "--help"
+  end
+end
+"""
+    write_file(formula_path, formula)
+
+    // Push tap
+    print("Pushing tap...")
+    tap = "{repo}/{tap_path}"
+    $`git -C {tap} add Formula/council.rb`
+    $`git -C {tap} commit -m "council {release}"`
+    $`git -C {tap} push`
+
+    print("Done! {tag} released.")
