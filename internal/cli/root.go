@@ -20,7 +20,8 @@ var (
 	joinUsed   *bool
 	leaveUsed  *bool
 	statusUsed *bool
-	postUsed   *bool
+	postUsed    *bool
+	installUsed *bool
 )
 
 // Run is the main entry point for the CLI
@@ -35,6 +36,7 @@ func Run() {
 	leaveUsed, _ = rootCmd.RegisterCmd(setupLeaveCmd())
 	statusUsed, _ = rootCmd.RegisterCmd(setupStatusCmd())
 	postUsed, _ = rootCmd.RegisterCmd(setupPostCmd())
+	installUsed, _ = rootCmd.RegisterCmd(setupInstallCmd())
 
 	rootCmd.ParseOrExit(os.Args[1:])
 
@@ -50,6 +52,8 @@ func Run() {
 		handleStatus()
 	case *postUsed:
 		handlePost()
+	case *installUsed:
+		handleInstall()
 	}
 }
 
