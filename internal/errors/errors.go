@@ -60,3 +60,12 @@ type ParticipantNotInSessionError struct {
 func (e *ParticipantNotInSessionError) Error() string {
 	return fmt.Sprintf("'%s' is not a participant in session '%s'.", e.Name, e.SessionID)
 }
+
+// InvalidNextParticipantError indicates the --next value is not valid
+type InvalidNextParticipantError struct {
+	Name string
+}
+
+func (e *InvalidNextParticipantError) Error() string {
+	return fmt.Sprintf("'%s' is not an active participant or 'Moderator'. Cannot use as --next.", e.Name)
+}

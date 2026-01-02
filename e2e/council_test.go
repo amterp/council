@@ -67,9 +67,9 @@ func TestNewSession(t *testing.T) {
 		t.Errorf("expected 3-word session ID, got %d parts: %s", len(parts), sessionID)
 	}
 
-	// Verify session file was created
+	// Verify session file was created in the new directory structure
 	home, _ := os.UserHomeDir()
-	sessionPath := filepath.Join(home, ".council", "sessions", sessionID+".jsonl")
+	sessionPath := filepath.Join(home, ".council", "sessions", sessionID, "events.jsonl")
 	if _, err := os.Stat(sessionPath); os.IsNotExist(err) {
 		t.Errorf("session file not created at %s", sessionPath)
 	}
@@ -78,11 +78,22 @@ func TestNewSession(t *testing.T) {
 func TestJoinSession(t *testing.T) {
 	sessionID := createSession(t)
 
-	// Join the session
-	joinSession(t, sessionID, "Engineer")
+	// Join the session and verify output
+	stdout, stderr, exitCode := runCouncil(t, "", "join", sessionID, "--participant", "Engineer")
+	if exitCode != 0 {
+		t.Fatalf("council join failed: %s", stderr)
+	}
+
+	// Verify join output shows event number
+	if !strings.Contains(stdout, "Joined session as event #2") {
+		t.Errorf("expected 'Joined session as event #2', got: %s", stdout)
+	}
+	if !strings.Contains(stdout, "Use --after 2 for your first post") {
+		t.Errorf("expected '--after 2' guidance, got: %s", stdout)
+	}
 
 	// Verify participant appears in status
-	stdout, _, exitCode := runCouncil(t, "", "status", sessionID)
+	stdout, _, exitCode = runCouncil(t, "", "status", sessionID)
 	if exitCode != 0 {
 		t.Fatalf("council status failed")
 	}
@@ -130,18 +141,27 @@ func TestPostMessage(t *testing.T) {
 	joinSession(t, sessionID, "Engineer")
 
 	// Post a message (after event #2 = session_created + joined)
-	_, stderr, exitCode := runCouncil(t, "Hello world!", "post", sessionID, "--participant", "Engineer", "--after", "2")
+	stdout, stderr, exitCode := runCouncil(t, "Hello world!", "post", sessionID, "--participant", "Engineer", "--after", "2")
 	if exitCode != 0 {
 		t.Fatalf("council post failed: %s", stderr)
 	}
 
+	// Verify post output shows event number
+	if !strings.Contains(stdout, "Posted as event #3") {
+		t.Errorf("expected 'Posted as event #3', got: %s", stdout)
+	}
+
 	// Verify message appears in status
-	stdout, _, _ := runCouncil(t, "", "status", sessionID)
+	stdout, _, _ = runCouncil(t, "", "status", sessionID)
 	if !strings.Contains(stdout, "Hello world!") {
 		t.Errorf("message not found in status, got: %s", stdout)
 	}
 	if !strings.Contains(stdout, "--- #3 | Engineer ---") {
 		t.Errorf("message header not found, got: %s", stdout)
+	}
+	// Verify end marker includes author (Next defaults to Moderator when no other participants)
+	if !strings.Contains(stdout, "--- End #3 | Engineer | Next: Moderator ---") {
+		t.Errorf("message end marker not found with correct format, got: %s", stdout)
 	}
 }
 
@@ -280,5 +300,56 @@ func TestCannotPostAfterLeave(t *testing.T) {
 
 	if !strings.Contains(stderr, "must join") {
 		t.Errorf("expected 'must join' error, got: %s", stderr)
+	}
+}
+
+func TestNextFlag(t *testing.T) {
+	sessionID := createSession(t)
+	joinSession(t, sessionID, "Engineer")
+	joinSession(t, sessionID, "Designer")
+
+	// Post with explicit --next
+	_, stderr, exitCode := runCouncil(t, "Hello Designer!", "post", sessionID, "--participant", "Engineer", "--after", "3", "--next", "Designer")
+	if exitCode != 0 {
+		t.Fatalf("council post with --next failed: %s", stderr)
+	}
+
+	// Verify Next appears in status output
+	stdout, _, _ := runCouncil(t, "", "status", sessionID)
+	if !strings.Contains(stdout, "Next: Designer") {
+		t.Errorf("expected 'Next: Designer' in output, got: %s", stdout)
+	}
+}
+
+func TestNextFlagDefaulting(t *testing.T) {
+	sessionID := createSession(t)
+	joinSession(t, sessionID, "Engineer")
+	joinSession(t, sessionID, "Designer")
+
+	// First post from Engineer (no previous speaker, should pick random other = Designer)
+	runCouncil(t, "First message", "post", sessionID, "--participant", "Engineer", "--after", "3")
+
+	// Second post from Designer (previous speaker = Engineer)
+	runCouncil(t, "Second message", "post", sessionID, "--participant", "Designer", "--after", "4")
+
+	// Verify Next defaults to previous speaker (Engineer)
+	stdout, _, _ := runCouncil(t, "", "status", sessionID)
+	if !strings.Contains(stdout, "--- End #5 | Designer | Next: Engineer ---") {
+		t.Errorf("expected Next to default to Engineer, got: %s", stdout)
+	}
+}
+
+func TestNextFlagInvalidParticipant(t *testing.T) {
+	sessionID := createSession(t)
+	joinSession(t, sessionID, "Engineer")
+
+	// Try to post with --next pointing to non-existent participant
+	_, stderr, exitCode := runCouncil(t, "Hello!", "post", sessionID, "--participant", "Engineer", "--after", "2", "--next", "Ghost")
+	if exitCode == 0 {
+		t.Error("expected error for invalid --next, but command succeeded")
+	}
+
+	if !strings.Contains(stderr, "not an active participant") {
+		t.Errorf("expected 'not an active participant' error, got: %s", stderr)
 	}
 }

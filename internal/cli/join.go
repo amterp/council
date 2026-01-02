@@ -40,11 +40,13 @@ func handleJoin() {
 		name = promptForName("Enter your participant name: ")
 	}
 
-	err := session.JoinSession(*joinSessionID, name)
+	eventNum, err := session.JoinSession(*joinSessionID, name)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
+
+	fmt.Printf("Joined session as event #%d. Use --after %d for your first post.\n", eventNum, eventNum)
 }
 
 // promptForName prompts the user for a name via stdin

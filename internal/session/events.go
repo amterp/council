@@ -59,6 +59,7 @@ type MessageEvent struct {
 	BaseEvent
 	Participant string `json:"participant"`
 	Content     string `json:"content"`
+	Next        string `json:"next"` // next suggested speaker
 }
 
 // Now returns the current timestamp in milliseconds
@@ -100,7 +101,7 @@ func NewLeftEvent(participant string) *LeftEvent {
 }
 
 // NewMessageEvent creates a new message event
-func NewMessageEvent(participant, content string) *MessageEvent {
+func NewMessageEvent(participant, content, next string) *MessageEvent {
 	return &MessageEvent{
 		BaseEvent: BaseEvent{
 			Type:            EventTypeMessage,
@@ -108,6 +109,7 @@ func NewMessageEvent(participant, content string) *MessageEvent {
 		},
 		Participant: participant,
 		Content:     content,
+		Next:        next,
 	}
 }
 

@@ -22,8 +22,10 @@ Council is a CLI tool for running collaborative sessions between multiple partic
 
 ### Location
 ```
-~/.council/sessions/<session-id>.jsonl
+~/.council/sessions/<session-id>/events.jsonl
 ```
+
+Each session is a directory containing `events.jsonl`.
 
 ### Format
 JSONL (JSON Lines). Each line is a self-contained event. Line number = event number (1-indexed for display, 0-indexed in file).
@@ -42,15 +44,15 @@ All events share:
 | `session_created` | `id` | First line. Created by `council new`. |
 | `joined` | `participant` | A participant entered the session. |
 | `left` | `participant` | A participant departed the session. |
-| `message` | `participant`, `content` | A contribution to the discussion. |
+| `message` | `participant`, `content`, `next` | A contribution to the discussion. `next` designates who should speak next. |
 
 **Example session file:**
 ```jsonl
 {"type": "session_created", "id": "hopeful-coral-tiger", "timestamp_millis": 1705312200000}
-{"type": "joined", "participant": "Moderator", "timestamp_millis": 1705312205000}
-{"type": "message", "participant": "Moderator", "content": "Welcome everyone. Today we're designing...", "timestamp_millis": 1705312210000}
 {"type": "joined", "participant": "Engineer", "timestamp_millis": 1705312260000}
-{"type": "message", "participant": "Engineer", "content": "Thanks for having me.", "timestamp_millis": 1705312290000}
+{"type": "joined", "participant": "Architect", "timestamp_millis": 1705312265000}
+{"type": "message", "participant": "Engineer", "content": "I think we need OAuth2.", "next": "Architect", "timestamp_millis": 1705312290000}
+{"type": "message", "participant": "Architect", "content": "Agreed. Let's design the flow.", "next": "Engineer", "timestamp_millis": 1705312350000}
 {"type": "left", "participant": "Engineer", "timestamp_millis": 1705316400000}
 ```
 
@@ -101,9 +103,15 @@ Joins a session as a named participant.
 - Prompts for participant name (or accept via flag)
 - Acquires lock, checks for duplicate names, appends `joined` event
 - Rejects reserved name "Moderator"
+- **Returns the event number** for use with first `--after`
 
 **Flags:**
-- `--name <name>`: Provide name without interactive prompt
+- `--participant <name>` or `-p`: Provide name without interactive prompt
+
+**Output:**
+```
+Joined session as event #7. Use --after 7 for your first post.
+```
 
 **Errors:**
 - Session not found
@@ -132,29 +140,39 @@ Displays session state.
 
 **Flags:**
 - `--after N`: Only show events after event number N
+- `--await`: Block until new events arrive AND it's your turn (requires `--participant`)
+- `--participant <name>` or `-p`: Your participant name (required with `--await`)
+- `--timeout <seconds>`: Timeout for `--await` (default: 300)
+
+**Await behavior:**
+When `--await` is used, the command blocks until:
+1. Event count exceeds `--after N`
+2. The latest message's `next` field matches `--participant`
+
+If the latest message's `next` doesn't match, the command auto-increments its internal after counter and continues waiting.
 
 **Output format:**
 ```
 === Session: hopeful-coral-tiger ===
-Participants: Moderator, Engineer
+Participants: Engineer, Architect
 
---- #5 | Moderator ---
-Welcome everyone. Today we're designing the new auth system.
-Let's start with requirements.
---- End #5 ---
+--- #5 | Engineer Joined ---
 
---- #6 | Engineer Joined ---
+--- #6 | Architect Joined ---
 
 --- #7 | Engineer ---
 I think we need to consider OAuth2 from the start.
 Here's my reasoning...
---- End #7 ---
+--- End #7 | Engineer | Next: Architect ---
 
---- #8 | Engineer Left ---
+--- #8 | Architect ---
+Agreed. Let's discuss the token flow.
+--- End #8 | Architect | Next: Engineer ---
 ```
 
 **Notes:**
 - Messages have explicit start and end markers
+- End markers include the author and next speaker: `--- End #N | Author | Next: Speaker ---`
 - Join/leave events shown inline as single-line entries
 - No timestamps in output (reduces noise for LLM context)
 - Event numbers shown as `#N`
@@ -167,15 +185,31 @@ Posts a message to the session.
 - Content via stdin or `--file`
 - Requires participant name via `--participant`
 - Requires `--after N` for optimistic locking (safety measure)
+- **Returns the new event number**
 
 **Flags:**
-- `--participant <name>`: Required. Who is posting.
-- `--file <path>`: Read content from file instead of stdin.
+- `--participant <name>` or `-p`: Required. Who is posting.
+- `--file <path>` or `-f`: Read content from file instead of stdin.
 - `--after N`: Required. Only post if latest event is exactly N. Fail otherwise.
+- `--next <name>` or `-n`: Optional. Designate the next speaker.
+
+**`--next` defaulting:**
+If `--next` is not provided, it defaults to:
+1. Previous speaker (author of the message before this one)
+2. If none: random active participant (excluding self)
+3. If none: "Moderator"
+
+The `--next` value is validated: must be an active participant or "Moderator".
+
+**Output:**
+```
+Posted as event #12.
+```
 
 **Errors:**
 - Participant not in session (hasn't joined)
 - `--after` mismatch: "New activity since event #N. Re-check with 'council status <id> --after N'"
+- Invalid `--next`: "<name> is not an active participant or 'Moderator'. Cannot use as --next."
 
 ---
 
@@ -220,53 +254,12 @@ All errors should be helpful and actionable:
 
 ## SKILL.md (for LLM Participants)
 
-```markdown
-# Council - Multi-Agent Collaboration
+See the separate `SKILL.md` file for the full participant instructions. Key concepts:
 
-Participate in collaborative sessions with other participants and a moderator.
-
-## Joining
-
-1. Run `council join <session-id>`
-2. Review current participants
-3. Enter an identifier based on your role/expertise (must be unique)
-
-## Participating
-
-1. Check for updates:
-   ```bash
-   council status <session-id> --after <last-seen-event>
-   ```
-   Use `--after 0` on first check (or omit to see all).
-
-2. Read new messages and deliberate your response.
-
-3. Post your contribution:
-   ```bash
-   council post <session-id> --participant "Your Name" --after <last-seen-event> <<EOF
-   Your message here...
-   EOF
-   ```
-
-   The `--after` flag ensures you don't post based on stale context. If new messages arrived, you'll get an error prompting you to re-read.
-
-4. Track the latest event number for your next `--after` call.
-
-## Norms
-
-- **Constructive honesty**: Build on strong ideas. Respectfully challenge weak ones. Don't agree just to agree.
-- **Acknowledge then advance**: Briefly acknowledge others' points before adding your own. Don't let good points get lost.
-- **Be concise**: Respect others' context windows. Trust them to ask if they need more - and do the same.
-- **Direct when needed**: If you want someone specific to respond next, suggest it.
-- **Flag stalls**: If the discussion is circling or stuck, call it out.
-
-## Important
-
-- Your terminal output is visible to the moderator watching you work
-- Only `council post` messages are part of the shared record
-- If your post fails due to new activity, re-read and reconsider before posting
-- A human "Moderator" may interject occasionally. They don't appear in the participants list but their messages are visible.
-```
+- **Session Scope**: Sessions are self-contained. Focus on durable artifacts, not personal follow-up commitments.
+- **Operating Modes**: Autonomous (default, uses `--await`) vs Orchestrated (human controls turn-taking).
+- **Turn-Taking**: Use `--next` to designate who speaks next. Use `--await` to wait for your turn.
+- **Event Numbers**: `join` and `post` return event numbers for your next `--after`.
 
 ---
 

@@ -15,6 +15,7 @@ var (
 	postParticipant *string
 	postAfter       *int
 	postFile        *string
+	postNext        *string
 )
 
 func setupPostCmd() *ra.Cmd {
@@ -43,6 +44,13 @@ func setupPostCmd() *ra.Cmd {
 		SetUsage("Read content from file instead of stdin").
 		Register(postCmd)
 
+	postNext, _ = ra.NewString("next").
+		SetShort("n").
+		SetFlagOnly(true).
+		SetOptional(true).
+		SetUsage("Designate the next speaker (defaults to previous speaker)").
+		Register(postCmd)
+
 	return postCmd
 }
 
@@ -53,11 +61,19 @@ func handlePost() {
 		os.Exit(1)
 	}
 
-	err = session.PostMessage(*postSessionID, *postParticipant, content, *postAfter)
+	// postNext may be nil if optional and not provided
+	next := ""
+	if postNext != nil {
+		next = *postNext
+	}
+
+	eventNum, err := session.PostMessage(*postSessionID, *postParticipant, content, next, *postAfter)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
+
+	fmt.Printf("Posted as event #%d.\n", eventNum)
 }
 
 // readContent reads message content from file or stdin

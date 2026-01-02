@@ -19,13 +19,31 @@ func SessionsPath() (string, error) {
 	return filepath.Join(home, CouncilDir, SessionsDir), nil
 }
 
-// SessionPath returns the path to a specific session file
-func SessionPath(sessionID string) (string, error) {
+// SessionDirPath returns the path to a specific session directory
+func SessionDirPath(sessionID string) (string, error) {
 	sessionsDir, err := SessionsPath()
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(sessionsDir, sessionID+".jsonl"), nil
+	return filepath.Join(sessionsDir, sessionID), nil
+}
+
+// SessionEventsPath returns the path to a session's events.jsonl file
+func SessionEventsPath(sessionID string) (string, error) {
+	sessionDir, err := SessionDirPath(sessionID)
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(sessionDir, "events.jsonl"), nil
+}
+
+// EnsureSessionDir creates a session's directory if it doesn't exist
+func EnsureSessionDir(sessionID string) error {
+	path, err := SessionDirPath(sessionID)
+	if err != nil {
+		return err
+	}
+	return os.MkdirAll(path, 0755)
 }
 
 // EnsureSessionsDir creates the sessions directory if it doesn't exist
@@ -37,9 +55,9 @@ func EnsureSessionsDir() error {
 	return os.MkdirAll(path, 0755)
 }
 
-// SessionExists checks if a session file exists
+// SessionExists checks if a session's events file exists
 func SessionExists(sessionID string) (bool, error) {
-	path, err := SessionPath(sessionID)
+	path, err := SessionEventsPath(sessionID)
 	if err != nil {
 		return false, err
 	}

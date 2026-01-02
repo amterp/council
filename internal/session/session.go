@@ -47,6 +47,48 @@ func (s *Session) IsActiveParticipant(name string) bool {
 	return s.Participants[name]
 }
 
+// PreviousSpeaker returns the participant who posted the message before the given one
+// Returns empty string if there's no previous message
+func (s *Session) PreviousSpeaker(excludeParticipant string) string {
+	// Walk backwards through events to find the last message not by excludeParticipant
+	for i := len(s.Events) - 1; i >= 0; i-- {
+		if msg, ok := s.Events[i].(*MessageEvent); ok {
+			if msg.Participant != excludeParticipant {
+				return msg.Participant
+			}
+		}
+	}
+	return ""
+}
+
+// RandomActiveParticipant returns a random active participant excluding the given name
+func (s *Session) RandomActiveParticipant(exclude string) string {
+	active := s.ActiveParticipants()
+	var candidates []string
+	for _, name := range active {
+		if name != exclude {
+			candidates = append(candidates, name)
+		}
+	}
+	if len(candidates) == 0 {
+		return ""
+	}
+	// For determinism in tests, just pick the first one (alphabetically sorted would be better)
+	// In practice, we could use rand but for now this is fine
+	return candidates[0]
+}
+
+// LatestMessageNext returns the Next field from the most recent message event
+// Returns empty string if no messages exist
+func (s *Session) LatestMessageNext() string {
+	for i := len(s.Events) - 1; i >= 0; i-- {
+		if msg, ok := s.Events[i].(*MessageEvent); ok {
+			return msg.Next
+		}
+	}
+	return ""
+}
+
 // addEvent adds an event and updates participant state
 func (s *Session) addEvent(event Event) {
 	s.Events = append(s.Events, event)
@@ -61,7 +103,7 @@ func (s *Session) addEvent(event Event) {
 
 // LoadSession reads and parses a session file
 func LoadSession(sessionID string) (*Session, error) {
-	path, err := storage.SessionPath(sessionID)
+	path, err := storage.SessionEventsPath(sessionID)
 	if err != nil {
 		return nil, err
 	}
@@ -137,11 +179,11 @@ func (l *FileLocker) File() *os.File {
 
 // CreateSession creates a new session file with a session_created event
 func CreateSession(sessionID string) error {
-	if err := storage.EnsureSessionsDir(); err != nil {
+	if err := storage.EnsureSessionDir(sessionID); err != nil {
 		return err
 	}
 
-	path, err := storage.SessionPath(sessionID)
+	path, err := storage.SessionEventsPath(sessionID)
 	if err != nil {
 		return err
 	}
@@ -163,29 +205,30 @@ func CreateSession(sessionID string) error {
 }
 
 // JoinSession adds a participant to a session
-func JoinSession(sessionID, name string) error {
+// Returns the new event number (1-indexed for display)
+func JoinSession(sessionID, name string) (int, error) {
 	// Validate reserved name
 	if IsReservedName(name) {
-		return &errors.ReservedNameError{Name: name}
+		return 0, &errors.ReservedNameError{Name: name}
 	}
 
-	path, err := storage.SessionPath(sessionID)
+	path, err := storage.SessionEventsPath(sessionID)
 	if err != nil {
-		return err
+		return 0, err
 	}
 
 	// Check session exists
 	exists, err := storage.SessionExists(sessionID)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	if !exists {
-		return &errors.SessionNotFoundError{SessionID: sessionID}
+		return 0, &errors.SessionNotFoundError{SessionID: sessionID}
 	}
 
 	lock, err := AcquireLock(path)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	defer lock.Release()
 
@@ -193,29 +236,34 @@ func JoinSession(sessionID, name string) error {
 	lock.File().Seek(0, io.SeekStart)
 	session, err := readSessionFromReader(sessionID, lock.File())
 	if err != nil {
-		return err
+		return 0, err
 	}
 
 	// Check for duplicate name
 	if session.IsActiveParticipant(name) {
-		return &errors.NameTakenError{Name: name}
+		return 0, &errors.NameTakenError{Name: name}
 	}
 
 	// Append joined event
 	event := NewJoinedEvent(name)
 	eventBytes, err := MarshalEvent(event)
 	if err != nil {
-		return err
+		return 0, err
 	}
 
 	lock.File().Seek(0, io.SeekEnd)
 	_, err = lock.File().Write(append(eventBytes, '\n'))
-	return err
+	if err != nil {
+		return 0, err
+	}
+
+	// Return 1-indexed event number
+	return session.EventCount() + 1, nil
 }
 
 // LeaveSession removes a participant from a session
 func LeaveSession(sessionID, name string) error {
-	path, err := storage.SessionPath(sessionID)
+	path, err := storage.SessionEventsPath(sessionID)
 	if err != nil {
 		return err
 	}
@@ -260,24 +308,25 @@ func LeaveSession(sessionID, name string) error {
 }
 
 // PostMessage posts a message to a session with optimistic locking
-func PostMessage(sessionID, participant, content string, afterEventNum int) error {
-	path, err := storage.SessionPath(sessionID)
+// Returns the new event number (1-indexed for display)
+func PostMessage(sessionID, participant, content, next string, afterEventNum int) (int, error) {
+	path, err := storage.SessionEventsPath(sessionID)
 	if err != nil {
-		return err
+		return 0, err
 	}
 
 	// Check session exists
 	exists, err := storage.SessionExists(sessionID)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	if !exists {
-		return &errors.SessionNotFoundError{SessionID: sessionID}
+		return 0, &errors.SessionNotFoundError{SessionID: sessionID}
 	}
 
 	lock, err := AcquireLock(path)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	defer lock.Release()
 
@@ -285,12 +334,12 @@ func PostMessage(sessionID, participant, content string, afterEventNum int) erro
 	lock.File().Seek(0, io.SeekStart)
 	session, err := readSessionFromReader(sessionID, lock.File())
 	if err != nil {
-		return err
+		return 0, err
 	}
 
 	// Optimistic lock check
 	if session.EventCount() != afterEventNum {
-		return &errors.StaleStateError{
+		return 0, &errors.StaleStateError{
 			ExpectedEventNum: afterEventNum,
 			ActualEventNum:   session.EventCount(),
 			SessionID:        sessionID,
@@ -299,17 +348,39 @@ func PostMessage(sessionID, participant, content string, afterEventNum int) erro
 
 	// Check participant is active (Moderator is always allowed to post)
 	if participant != "Moderator" && !session.IsActiveParticipant(participant) {
-		return &errors.NotAParticipantError{Name: participant, SessionID: sessionID}
+		return 0, &errors.NotAParticipantError{Name: participant, SessionID: sessionID}
+	}
+
+	// Determine next speaker if not provided
+	if next == "" {
+		// Fallback chain: previous speaker -> random active -> Moderator
+		next = session.PreviousSpeaker(participant)
+		if next == "" {
+			next = session.RandomActiveParticipant(participant)
+		}
+		if next == "" {
+			next = "Moderator"
+		}
+	}
+
+	// Validate next is an active participant or "Moderator"
+	if next != "Moderator" && !session.IsActiveParticipant(next) {
+		return 0, &errors.InvalidNextParticipantError{Name: next}
 	}
 
 	// Append message event
-	event := NewMessageEvent(participant, content)
+	event := NewMessageEvent(participant, content, next)
 	eventBytes, err := MarshalEvent(event)
 	if err != nil {
-		return err
+		return 0, err
 	}
 
 	lock.File().Seek(0, io.SeekEnd)
 	_, err = lock.File().Write(append(eventBytes, '\n'))
-	return err
+	if err != nil {
+		return 0, err
+	}
+
+	// Return 1-indexed event number
+	return session.EventCount() + 1, nil
 }

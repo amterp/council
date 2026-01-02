@@ -47,7 +47,11 @@ func FormatStatus(sess *Session, afterN int) string {
 			if !strings.HasSuffix(e.Content, "\n") {
 				b.WriteString("\n")
 			}
-			fmt.Fprintf(&b, "--- End #%d ---\n\n", eventNum)
+			if e.Next != "" {
+				fmt.Fprintf(&b, "--- End #%d | %s | Next: %s ---\n\n", eventNum, e.Participant, e.Next)
+			} else {
+				fmt.Fprintf(&b, "--- End #%d | %s ---\n\n", eventNum, e.Participant)
+			}
 		}
 	}
 
