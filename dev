@@ -23,7 +23,10 @@ if push:
         exit(1)
     stdout = quiet $`git branch --show-current`
     branch = stdout.trim()
-    $`git push origin {branch} --tags`
+    $`git push origin {branch}`
+    // Push tags separately; ignore errors if tags already exist on remote
+    $`git push origin --tags` catch:
+        pass
 
 if release:
     // Ensure we're on main branch
