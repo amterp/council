@@ -1,0 +1,14 @@
+#!/usr/bin/env rad
+---
+Local development script for council.
+---
+
+args:
+    build b bool     # Build the project
+    validate v bool  # Build and run tests
+
+if build or validate:
+    $`go build -o council ./cmd/council`
+
+if validate:
+    $`go test ./...`
