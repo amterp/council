@@ -1,10 +1,16 @@
 package cli
 
 import (
+	_ "embed"
+	"fmt"
 	"os"
+	"strings"
 
 	"github.com/amterp/ra"
 )
+
+//go:embed skill.md
+var skillMd string
 
 var (
 	rootCmd *ra.Cmd
@@ -21,6 +27,7 @@ var (
 func Run() {
 	rootCmd = ra.NewCmd("council")
 	rootCmd.SetDescription("Multi-agent collaboration CLI tool")
+	rootCmd.SetCustomUsage(printUsage)
 
 	// Register subcommands
 	newUsed, _ = rootCmd.RegisterCmd(setupNewCmd())
@@ -44,4 +51,34 @@ func Run() {
 	case *postUsed:
 		handlePost()
 	}
+}
+
+func printUsage(isLongHelp bool) {
+	fmt.Print(rootCmd.GenerateShortUsage())
+
+	if isLongHelp {
+		fmt.Println()
+		fmt.Print(stripFrontmatter(skillMd))
+	} else {
+		fmt.Println("\nRun 'council --help' for full agent participation instructions.")
+	}
+}
+
+// stripFrontmatter removes YAML frontmatter (--- delimited) from markdown content
+func stripFrontmatter(content string) string {
+	if !strings.HasPrefix(content, "---") {
+		return content
+	}
+
+	// Find the closing ---
+	rest := content[3:] // skip opening ---
+	idx := strings.Index(rest, "---")
+	if idx == -1 {
+		return content
+	}
+
+	// Return everything after the closing --- (skip the --- and any immediate newline)
+	result := rest[idx+3:]
+	result = strings.TrimPrefix(result, "\n")
+	return result
 }
