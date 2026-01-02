@@ -6,9 +6,19 @@ Local development script for council.
 args:
     build b bool     # Build the project
     validate v bool  # Build and run tests
+    push p bool      # Push up to origin.
 
-if build or validate:
+if build or validate or push:
     $`go build -o council ./cmd/council`
 
-if validate:
+if validate or push:
     $`go test ./...`
+
+if push:
+    code, stdout = quiet $`git status --porcelain -uno`
+    if stdout != "":
+        print_err("Git status is not clean, aborting push")
+        exit(1)
+    stdout = quiet $`git branch --show-current`
+    branch = stdout.trim()
+    $`git push origin {branch}`
