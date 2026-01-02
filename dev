@@ -7,8 +7,10 @@ args:
     build b bool                      # Build the project
     validate v bool                   # Build and run tests
     push p bool                       # Push up to origin
-    release r str?                    # Release version (e.g., 0.1.0)
+    release r str?                    # Release type (patch, minor, major)
     tap_path str = "../homebrew-tap"  # Path to homebrew-tap repo
+
+    release enum ["patch", "minor", "major"]
 
 if build or validate or push or release:
     $`go build -o council ./cmd/council`
@@ -32,6 +34,38 @@ if release:
     if branch != "main":
         print_err("Release must be run from main branch (currently on '{branch}')")
         exit(1)
+
+    // Calculate new version from latest tag
+    stdout = quiet $`git tag -l 'v*' --sort=-v:refname`
+    tags = stdout.trim().split("\n")
+    if tags.len() == 0 or tags[0] == "":
+        print_err("No existing tags found. Create initial tag v0.0.0 first.")
+        exit(1)
+    latest_tag = tags[0]
+
+    // Parse version (strip leading 'v')
+    version_str = latest_tag[1:]
+    parts = version_str.split("\\.")
+    major = parse_int(parts[0])
+    minor = parse_int(parts[1])
+    patch = parse_int(parts[2])
+
+    print("Current version: {version_str}")
+
+    // Bump based on type
+    switch release:
+        case "patch":
+            patch += 1
+        case "minor":
+            minor += 1
+            patch = 0
+        case "major":
+            major += 1
+            minor = 0
+            patch = 0
+
+    release = "{major}.{minor}.{patch}"
+    print("New version: {release}")
 
     // Paths
     stdout = quiet $`pwd`
