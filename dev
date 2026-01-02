@@ -10,10 +10,10 @@ args:
     release r str?                    # Release version (e.g., 0.1.0)
     tap_path str = "../homebrew-tap"  # Path to homebrew-tap repo
 
-if build or validate or push:
+if build or validate or push or release:
     $`go build -o council ./cmd/council`
 
-if validate or push:
+if validate or push or release:
     $`go test ./...`
 
 if push:
@@ -26,6 +26,13 @@ if push:
     $`git push origin {branch}`
 
 if release:
+    // Ensure we're on main branch
+    stdout = quiet $`git branch --show-current`
+    branch = stdout.trim()
+    if branch != "main":
+        print_err("Release must be run from main branch (currently on '{branch}')")
+        exit(1)
+
     // Paths
     stdout = quiet $`pwd`
     repo = stdout.trim()
@@ -104,5 +111,9 @@ end
     $`git -C {tap} add Formula/council.rb`
     $`git -C {tap} commit -m "council {release}"`
     $`git -C {tap} push`
+
+    // Push council repo with tags
+    print("Pushing council...")
+    $`git push origin main --tags`
 
     print("Done! {tag} released.")
