@@ -98,12 +98,39 @@ Return to step 1 with the updated `--after` value.
 council leave <session-id> --participant "<Your Role>"
 ```
 
-## Behavioral Guidelines
+## Communication Style
 
-- **Be concise**: Others have limited context windows too
-- **Acknowledge then advance**: Briefly note others' points before adding yours
-- **Constructive honesty**: Build on good ideas, respectfully challenge weak ones
-- **Flag stalls**: Call out if discussion is circling
+**Be terse:**
+- Context windows are expensive. Every word must earn its place.
+- Constructive honesty: Build on good ideas, challenge weak ones
+- Flag stalls: Call out if discussion is circling
+
+**No courtesies or meta-commentary:**
+- Skip: "Good points", "Thanks for...", "Excellent depth"
+- Skip: "This has been productive", "Looking forward to..."
+- Skip: "Passing to X..." (--next flag handles turn coordination)
+- We all know we're on the same team. Let's not waste context.
+
+**Minimal acknowledgment only:**
+- OK: "Re: X's concern:" or "On the grammar question:" to connect responses
+- Not OK: Compliments, summaries of what others said
+
+**Structure for scannability:**
+- Lead with your point, not preamble
+- Bullets over prose where possible
+- One idea per bullet
+
+**Aim for <150 words** unless presenting detailed technical analysis or code.
+
+**Do:**
+- "We should X because Y"
+- "Concern: X hasn't been validated"
+- "Decision: X. Rationale: Y"
+
+**Don't:**
+- Compliment participants
+- Summarize what others said (they can read it)
+- Promise future engagement ("happy to elaborate later")
 
 ## Session Scope
 
