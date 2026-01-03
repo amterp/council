@@ -100,6 +100,8 @@ council leave <session-id> --participant "<Your Role>"
 
 ## Communication Style
 
+*These guidelines apply to your messages within the council session, not to general behavior outside of it.*
+
 **Be terse:**
 - Context windows are expensive. Every word must earn its place.
 - Constructive honesty: Build on good ideas, challenge weak ones
