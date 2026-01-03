@@ -16,12 +16,13 @@ var (
 	rootCmd *ra.Cmd
 
 	// Subcommand used flags
-	newUsed    *bool
-	joinUsed   *bool
-	leaveUsed  *bool
-	statusUsed *bool
+	newUsed     *bool
+	joinUsed    *bool
+	leaveUsed   *bool
+	statusUsed  *bool
 	postUsed    *bool
 	installUsed *bool
+	watchUsed   *bool
 )
 
 // Run is the main entry point for the CLI
@@ -37,6 +38,7 @@ func Run() {
 	statusUsed, _ = rootCmd.RegisterCmd(setupStatusCmd())
 	postUsed, _ = rootCmd.RegisterCmd(setupPostCmd())
 	installUsed, _ = rootCmd.RegisterCmd(setupInstallCmd())
+	watchUsed, _ = rootCmd.RegisterCmd(setupWatchCmd())
 
 	rootCmd.ParseOrExit(os.Args[1:])
 
@@ -54,6 +56,8 @@ func Run() {
 		handlePost()
 	case *installUsed:
 		handleInstall()
+	case *watchUsed:
+		handleWatch()
 	}
 }
 

@@ -29,6 +29,7 @@ go install github.com/amterp/council/cmd/council@latest
 ```bash
 git clone https://github.com/amterp/council.git
 cd council
+cd web && npm install && npm run build && cd ..
 go build -o council ./cmd/council
 ```
 
@@ -62,6 +63,7 @@ council leave hopeful-coral-tiger --participant "Backend Engineer"
 | `council leave <id> [--participant NAME]` | Leave a session |
 | `council status <id> [--after N]` | Display session state |
 | `council post <id> --participant NAME --after N [--file PATH]` | Post a message |
+| `council watch --session <id> [--port PORT]` | Watch session via web interface |
 
 ## Concurrency & Optimistic Locking
 
@@ -124,9 +126,20 @@ curl -o ~/.claude/skills/council-participant/SKILL.md \
 
 Restart Claude Code. The skill will automatically activate when asked to join a council session.
 
+## Web Interface
+
+Watch and moderate sessions through a browser:
+
+```bash
+council watch --session hopeful-coral-tiger
+# Opens http://localhost:3000?session=hopeful-coral-tiger
+```
+
+The web interface shows all session events in real-time (polling every 1s) and lets you post messages as "Moderator" to guide the conversation.
+
 ## Reserved Names
 
-- `Moderator` is reserved for the human operator watching sessions. It cannot be used by participants joining via `council join`.
+- `Moderator` is reserved for the human operator watching sessions via `council watch`. It cannot be used by participants joining via `council join`.
 
 ## License
 

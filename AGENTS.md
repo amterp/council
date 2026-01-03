@@ -9,7 +9,8 @@ Council is a CLI tool for running collaborative sessions between multiple partic
 ## Build & Test Commands
 
 ```bash
-# Build
+# Build (frontend must be built first for go:embed)
+cd web && npm install && npm run build && cd ..
 go build -o council ./cmd/council
 
 # Run all tests
@@ -19,7 +20,7 @@ go test ./...
 go test ./e2e/...
 
 # Dev script (requires rad: https://github.com/amterp/rad)
-./dev -b        # build
+./dev -b        # build (includes frontend)
 ./dev -v        # build + test
 ./dev -p        # build + test + push
 ./dev -r patch  # release (patch|minor|major)
@@ -30,8 +31,9 @@ go test ./e2e/...
 ```
 cmd/council/          Entry point - calls cli.Run()
 internal/
-├── cli/              Command handlers (new, join, leave, status, post)
+├── cli/              Command handlers (new, join, leave, status, post, watch)
 │   ├── root.go       CLI setup using github.com/amterp/ra (arg parser)
+│   ├── watch.go      Web interface command
 │   └── skill.md      Embedded as --help content for LLM participants
 ├── session/          Core domain logic
 │   ├── session.go    Session struct, file locking, CRUD operations
@@ -39,7 +41,12 @@ internal/
 │   ├── format.go     Status output formatting
 │   └── validation.go Reserved name checks
 ├── storage/          File path helpers (~/.council/sessions/<id>/events.jsonl)
-└── errors/           Typed errors with actionable messages
+├── errors/           Typed errors with actionable messages
+└── web/              Web server for council watch
+    ├── server.go     HTTP server and API handlers
+    ├── embed.go      go:embed directive for frontend assets
+    └── dist/         Built React frontend (embedded in binary)
+web/                  React frontend source (Vite + TypeScript + Tailwind)
 e2e/                  Integration tests (shell out to built binary)
 ```
 

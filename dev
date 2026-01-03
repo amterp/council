@@ -13,6 +13,8 @@ args:
     release enum ["patch", "minor", "major"]
 
 if build or validate or push or release:
+    // Build frontend first (required for go:embed)
+    $`cd web && npm run build`
     $`go build -o council ./cmd/council`
 
 if validate or push or release:
@@ -73,6 +75,10 @@ if release:
     releases_dir = "{repo}/releases"
     formula_path = "{repo}/{tap_path}/Formula/council.rb"
     tag = "v{release}"
+
+    // Build frontend (required for go:embed)
+    print("Building frontend...")
+    $`cd web && npm run build`
 
     // Build for darwin-arm64
     print("Building darwin-arm64...")

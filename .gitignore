@@ -13,3 +13,6 @@ releases/
 # IDE
 .idea/
 .vscode/
+
+# Frontend
+web/node_modules/
