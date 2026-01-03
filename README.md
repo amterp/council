@@ -1,11 +1,11 @@
 # Council
 
-A CLI tool for running collaborative sessions between multiple participants—LLMs, humans, scripts, or anything that can execute shell commands.
+A CLI tool for running collaborative sessions between multiple LLM agents, with optional human moderation.
 
 ## Philosophy
 
 - **Stateless CLI**: All state lives in session files. The CLI reads/writes but holds nothing.
-- **File-based**: Sessions stored as JSONL in `~/.council/sessions/<id>.jsonl`
+- **File-based**: Sessions stored as JSONL in `~/.council/sessions/<id>/events.jsonl`
 - **Frontend-agnostic**: Any frontend (TUI, web, etc.) can read and display sessions.
 - **Participant-agnostic**: No assumptions about who or what is participating.
 
@@ -54,16 +54,19 @@ echo "Hello everyone!" | council post hopeful-coral-tiger \
 council leave hopeful-coral-tiger --participant "Backend Engineer"
 ```
 
+See [example](#claude-code-integration) of using this with Claude Code.
+
 ## Commands
 
-| Command | Description |
-|---------|-------------|
-| `council new` | Create a new session, outputs session ID |
-| `council join <id> [--participant NAME]` | Join a session as a participant |
-| `council leave <id> [--participant NAME]` | Leave a session |
-| `council status <id> [--after N]` | Display session state |
-| `council post <id> --participant NAME --after N [--file PATH]` | Post a message |
-| `council watch --session <id> [--port PORT]` | Watch session via web interface |
+| Command                                                        | Description                                           |
+|----------------------------------------------------------------|-------------------------------------------------------|
+| `council new`                                                  | Create a new session, outputs session ID              |
+| `council join <id> [--participant NAME]`                       | Join a session as a participant                       |
+| `council leave <id> [--participant NAME]`                      | Leave a session                                       |
+| `council status <id> [--after N]`                              | Display session state                                 |
+| `council post <id> --participant NAME --after N [--file PATH]` | Post a message                                        |
+| `council watch --session <id> [--port PORT]`                   | Watch session via web interface                       |
+| `council install <target>`                                     | Install integrations (e.g., `council install claude`) |
 
 ## Concurrency & Optimistic Locking
 
@@ -114,17 +117,71 @@ The participation loop is simple:
 
 See [SKILL.md](SKILL.md) for detailed instructions and behavioral guidelines.
 
-### Claude Code Skill
+### Claude Code Integration
 
-Install the skill globally so Claude Code can participate in sessions from any project:
+Install the council-participant skill so Claude Code can join sessions from any project:
 
 ```bash
-mkdir -p ~/.claude/skills/council-participant
-curl -o ~/.claude/skills/council-participant/SKILL.md \
-  https://raw.githubusercontent.com/amterp/council/main/SKILL.md
+council install claude
 ```
 
-Restart Claude Code. The skill will automatically activate when asked to join a council session.
+This installs the skill to `~/.claude/skills/council-participant/`. Restart Claude Code to activate.
+
+> **Alternative**: You can manually download [SKILL.md](SKILL.md) to `~/.claude/skills/council-participant/SKILL.md`.
+
+### Example: Multi-Agent Collaboration with Claude Code
+
+Council shines when you have multiple Claude Code instances collaborate - each bringing different expertise
+via [output-styles](https://docs.anthropic.com/en/docs/claude-code/settings#output-style), or working from different
+codebases.
+
+**The scenario**: You're designing a new syntax feature for a programming language. You want diverse perspectives:
+
+| Terminal | Role                  | Notes                                                             |
+|----------|-----------------------|-------------------------------------------------------------------|
+| 1        | **Software Engineer** | Main compiler repo, general SWE output-style                      |
+| 2        | **Grammar Expert**    | Grammar repo, output-style tuned for parsing/syntax               |
+| 3        | **Devil's Advocate**  | Main repo, output-style customized for constructive contrarianism |
+| 4        | Human moderator       | Creates session, watches via web UI                               |
+
+For the Devil's Advocate, you might add something like this to their output-style:
+
+> *Your role is to be a constructive contrarian. Challenge assumptions, identify blind spots, and guard against
+groupthink. When everyone agrees too quickly, probe deeper. Stress-test ideas before they're committed to.*
+
+**Step 1: Create the session** (Terminal 4)
+
+```bash
+council new                                  # -> hopeful-coral-tiger
+council watch --session hopeful-coral-tiger  # opens web UI
+```
+
+**Step 2: Brief each Claude** (Terminals 1-3)
+
+Give each Claude the task context and session ID:
+
+> *"We're designing a new pattern-matching syntax. Explore the codebase to understand our current approach, then join
+council session `hopeful-coral-tiger` to collaborate with the other participants."*
+
+Each Claude will:
+
+1. Explore its codebase to gather relevant context
+2. Join the session with an appropriate participant name
+3. Introduce itself and share relevant findings
+4. Wait for its turn (via `--await`), contribute ideas, respond to others
+5. Leave when the discussion concludes
+
+**Step 3: Watch and moderate**
+
+Follow the discussion in the web UI. As "Moderator", you can steer the conversation, add constraints, or call for
+decisions.
+
+**Why this works**:
+
+- Each agent brings a distinct perspective shaped by its output-style and codebase context
+- The Devil's Advocate ensures ideas get stress-tested before consensus
+- You maintain oversight without being in the critical path
+- All discussion is logged to `~/.council/sessions/<id>/events.jsonl`
 
 ## Web Interface
 
@@ -135,11 +192,13 @@ council watch --session hopeful-coral-tiger
 # Opens http://localhost:3000?session=hopeful-coral-tiger
 ```
 
-The web interface shows all session events in real-time (polling every 1s) and lets you post messages as "Moderator" to guide the conversation.
+The web interface shows all session events in real-time (polling every 1s) and lets you post messages as "Moderator" to
+guide the conversation.
 
 ## Reserved Names
 
-- `Moderator` is reserved for the human operator watching sessions via `council watch`. It cannot be used by participants joining via `council join`.
+- `Moderator` is reserved for the human operator watching sessions via `council watch`. It cannot be used by
+  participants joining via `council join`.
 
 ## License
 
