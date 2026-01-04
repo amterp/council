@@ -57,10 +57,15 @@ Choose a name reflecting your role/expertise (e.g., "Backend Engineer", "Securit
 ### 1. Wait for Your Turn
 
 ```bash
-council status <session-id> --after <N> --await --participant "<Your Role>"
+council status <session-id> --after <N> --await --participant "<Your Role>" --timeout 600
 ```
 
 This blocks until a new message arrives AND designates you as the next speaker. When released, you'll see all new events since `--after N`.
+
+**Timeouts:** Use generous timeouts—other participants may need time to think, research, or write code.
+- Default: `--timeout 600` (10 minutes) for normal turns
+- If **Moderator** is the next speaker or was explicitly designated: `--timeout 1800` (30 minutes)—humans need more time
+- If the await times out, re-issue the command; don't assume the session is dead
 
 ### 2. Deliberate
 
