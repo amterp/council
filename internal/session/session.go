@@ -33,7 +33,7 @@ func (s *Session) EventCount() int {
 
 // ActiveParticipants returns a list of currently active participants (excluding Moderator)
 func (s *Session) ActiveParticipants() []string {
-	var result []string
+	result := []string{}
 	for name, active := range s.Participants {
 		if active && name != "Moderator" {
 			result = append(result, name)
