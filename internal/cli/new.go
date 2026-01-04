@@ -13,8 +13,9 @@ import (
 )
 
 var (
-	newCmd  *ra.Cmd
-	newCopy *bool
+	newCmd   *ra.Cmd
+	newCopy  *bool
+	newWatch *bool
 )
 
 func setupNewCmd() *ra.Cmd {
@@ -26,6 +27,13 @@ func setupNewCmd() *ra.Cmd {
 		SetFlagOnly(true).
 		SetOptional(true).
 		SetUsage("Copy session ID to clipboard").
+		Register(newCmd)
+
+	newWatch, _ = ra.NewBool("watch").
+		SetShort("w").
+		SetFlagOnly(true).
+		SetOptional(true).
+		SetUsage("Open web interface after creating session").
 		Register(newCmd)
 
 	return newCmd
@@ -51,6 +59,10 @@ func handleNew() {
 			os.Exit(1)
 		}
 		fmt.Fprintln(os.Stderr, "Copied to clipboard.")
+	}
+
+	if newWatch != nil && *newWatch {
+		runWatchServer(sessionID, 0, true)
 	}
 }
 

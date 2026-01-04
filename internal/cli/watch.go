@@ -44,6 +44,45 @@ func setupWatchCmd() *ra.Cmd {
 	return watchCmd
 }
 
+// runWatchServer starts the watch web server for the given session.
+// If port is 0, it finds an available port starting from 3000.
+// If openBrowser is true, it auto-opens the URL in the default browser.
+// Blocks until Ctrl+C or server error.
+func runWatchServer(sessionID string, port int, openBrowser bool) {
+	if port == 0 {
+		port = web.FindAvailablePort(3000)
+	}
+
+	server := web.NewServer(sessionID, port)
+	serverErr := make(chan error, 1)
+
+	go func() {
+		if err := server.Start(); err != nil {
+			serverErr <- err
+		}
+	}()
+
+	url := fmt.Sprintf("http://localhost:%d?session=%s", port, sessionID)
+	fmt.Printf("Watching session at %s\n", url)
+
+	if openBrowser {
+		if err := web.OpenBrowser(url); err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: Could not open browser: %v\n", err)
+		}
+	}
+
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
+
+	select {
+	case <-sigChan:
+		fmt.Println("\nShutting down...")
+	case err := <-serverErr:
+		fmt.Fprintf(os.Stderr, "Server error: %v\n", err)
+		os.Exit(1)
+	}
+}
+
 func handleWatch() {
 	// Validate session ID provided
 	if watchSessionID == nil || *watchSessionID == "" {
@@ -62,43 +101,14 @@ func handleWatch() {
 		os.Exit(1)
 	}
 
-	// Determine port
-	port := 3000
+	// Determine port (0 means auto-find)
+	port := 0
 	if watchPort != nil && *watchPort > 0 {
 		port = *watchPort
-	} else {
-		port = web.FindAvailablePort(3000)
 	}
 
-	// Start server in goroutine
-	server := web.NewServer(*watchSessionID, port)
-	serverErr := make(chan error, 1)
+	// Determine if we should open browser
+	openBrowser := watchNoOpen == nil || !*watchNoOpen
 
-	go func() {
-		if err := server.Start(); err != nil {
-			serverErr <- err
-		}
-	}()
-
-	url := fmt.Sprintf("http://localhost:%d?session=%s", port, *watchSessionID)
-	fmt.Printf("Watching session at %s\n", url)
-
-	// Open browser (unless --no-open)
-	if watchNoOpen == nil || !*watchNoOpen {
-		if err := web.OpenBrowser(url); err != nil {
-			fmt.Fprintf(os.Stderr, "Warning: Could not open browser: %v\n", err)
-		}
-	}
-
-	// Block until interrupt or server error
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
-
-	select {
-	case <-sigChan:
-		fmt.Println("\nShutting down...")
-	case err := <-serverErr:
-		fmt.Fprintf(os.Stderr, "Server error: %v\n", err)
-		os.Exit(1)
-	}
+	runWatchServer(*watchSessionID, port, openBrowser)
 }
