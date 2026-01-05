@@ -1,0 +1,11 @@
+{
+  "_v": 1,
+  "id": "2RpL4piA",
+  "alias": "agents-get-stuck-awaiting",
+  "alias_explicit": false,
+  "title": "Agents get stuck awaiting when others leave",
+  "description": "Some agents get stuck in awaiting state, especially when other agents are leaving and they're the only ones remaining, waiting to be called on.",
+  "creator": "Alexander Terp",
+  "created_at_millis": 1767587448783,
+  "updated_at_millis": 1767587448783
+}

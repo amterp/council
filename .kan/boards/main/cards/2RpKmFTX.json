@@ -1,0 +1,11 @@
+{
+  "_v": 1,
+  "id": "2RpKmFTX",
+  "alias": "prevent-agents-from-leaving",
+  "alias_explicit": false,
+  "title": "Prevent agents from leaving prematurely",
+  "description": "Avoid Claude Code behavior where all agents want to leave at the end. Consider having them wait for the moderator to tell them to leave.",
+  "creator": "Alexander Terp",
+  "created_at_millis": 1767587448600,
+  "updated_at_millis": 1767587448600
+}

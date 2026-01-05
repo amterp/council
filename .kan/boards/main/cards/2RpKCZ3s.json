@@ -1,0 +1,11 @@
+{
+  "_v": 1,
+  "id": "2RpKCZ3s",
+  "alias": "session-forking",
+  "alias_explicit": false,
+  "title": "Session forking",
+  "description": "Either explicit forking that inherits history from another session, or dynamic forking where agents can branch off into separate sessions that reference the original but don't include its history",
+  "creator": "Alexander Terp",
+  "created_at_millis": 1767587448248,
+  "updated_at_millis": 1767587448248
+}
